@@ -18,6 +18,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Thêm vendor directory (chứa các gói Pro) vào Python path
+VENDOR_DIR = PROJECT_ROOT / "vendor"
+if VENDOR_DIR.exists() and str(VENDOR_DIR) not in sys.path:
+    sys.path.insert(0, str(VENDOR_DIR))
+
 import streamlit as st
 
 from src.utils.config import get_settings
