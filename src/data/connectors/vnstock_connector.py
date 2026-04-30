@@ -106,6 +106,7 @@ class VnstockFreeConnector(BaseConnector):
 
             return df
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"❌ Error fetching {symbol} history: {e}")
             return None
 

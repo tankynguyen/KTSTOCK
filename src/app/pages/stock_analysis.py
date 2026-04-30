@@ -1,4 +1,4 @@
-﻿"""
+"""
 KTSTOCK - Stock Analysis Page
 Trang phân tích cổ phiếu chi tiết.
 """
@@ -40,6 +40,8 @@ def render_stock_analysis():
 
     if df is None or df.empty:
         st.warning(f"📭 Không có dữ liệu cho {symbol}")
+        if st.session_state.get("debug_mode", False) and hasattr(connector, 'last_error'):
+            st.error(f"🛠️ **DEBUG LOG**: {connector.last_error}")
         return
 
     # === Tabs ===

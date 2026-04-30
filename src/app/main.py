@@ -1,4 +1,4 @@
-﻿"""
+"""
 📊 KTSTOCK - Main Application Entry Point
 Nền tảng phân tích chứng khoán & crypto thông minh.
 
@@ -337,6 +337,8 @@ def render_sidebar():
 
         # === System Status ===
         st.divider()
+        st.session_state["debug_mode"] = st.checkbox("🛠️ Chế độ Debug (Lỗi API)", value=st.session_state.get("debug_mode", False))
+        
         st.caption("📡 System Status")
         st.markdown("""
         <div style="font-size: 0.75rem; line-height: 1.8;">
