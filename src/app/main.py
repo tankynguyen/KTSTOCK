@@ -337,7 +337,19 @@ def render_sidebar():
 
         # === System Status ===
         st.divider()
-        st.session_state["debug_mode"] = st.checkbox("🛠️ Chế độ Debug (Lỗi API)", value=st.session_state.get("debug_mode", False))
+        
+        # Debug mode with error count badge
+        error_count = 0
+        try:
+            from src.utils.debug_logger import get_debug_logger
+            error_count = get_debug_logger().get_error_count_today()
+        except Exception:
+            pass
+        
+        debug_label = "🛠️ Chế độ Debug"
+        if error_count > 0:
+            debug_label += f" (🔴 {error_count} lỗi)"
+        st.session_state["debug_mode"] = st.checkbox(debug_label, value=st.session_state.get("debug_mode", False))
         
         st.caption("📡 System Status")
         st.markdown("""
@@ -370,6 +382,7 @@ def render_main_content():
         "reports": ("📑", t("nav.reports", lang)),
         "settings": ("⚙️", t("nav.settings", lang)),
         "admin": ("🛡️", t("nav.admin", lang)),
+        "log_viewer": ("📋", t("nav.log_viewer", lang)),
     }
 
     icon, title = page_titles.get(page, ("📊", "Dashboard"))
@@ -418,6 +431,9 @@ def render_main_content():
     elif page == "admin":
         from src.app.pages.settings import render_admin
         render_admin()
+    elif page == "log_viewer":
+        from src.app.pages.log_viewer import render_log_viewer
+        render_log_viewer()
 
 
 # ============================================================

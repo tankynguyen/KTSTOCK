@@ -1,14 +1,17 @@
-﻿"""
+"""
 KTSTOCK - AI Insights, News, Reports, Macro Pages
 Các trang bổ sung cho hệ thống.
 """
+import time
 import streamlit as st
-from src.app.components.shared import error_handler, symbol_selector
+from src.app.components.shared import error_handler, symbol_selector, debug_show_inline
+from src.utils.debug_logger import get_debug_logger
 
 
 @error_handler
 def render_ai_insights():
     """Trang AI Insights - Chat và phân tích."""
+    dlog = get_debug_logger()
     st.markdown("### 💬 Chat với AI")
     if "ai_messages" not in st.session_state:
         st.session_state.ai_messages = []
@@ -28,16 +31,31 @@ def render_ai_insights():
 
         with st.chat_message("assistant"):
             with st.spinner("🤖 AI đang suy nghĩ..."):
+                t0 = time.perf_counter()
                 try:
                     from src.ai.services.analysis_service import AIAnalysisService
                     ai = AIAnalysisService()
                     response = ai.chat(user_input)
+                    duration = (time.perf_counter() - t0) * 1000
                     st.markdown(response)
                     st.session_state.ai_messages.append({"role": "assistant", "content": response})
+                    dlog.log_ai_request(
+                        page="ai_insights", component="render_ai_insights",
+                        provider="Gemini", prompt_preview=user_input,
+                        result_status="SUCCESS", duration_ms=duration
+                    )
+                    debug_show_inline("SUCCESS", "Gemini AI", duration)
                 except Exception as e:
+                    duration = (time.perf_counter() - t0) * 1000
                     err = f"❌ Lỗi AI: {e}"
                     st.error(err)
                     st.session_state.ai_messages.append({"role": "assistant", "content": err})
+                    dlog.log_ai_request(
+                        page="ai_insights", component="render_ai_insights",
+                        provider="Gemini", prompt_preview=user_input,
+                        result_status="ERROR", error=e, duration_ms=duration
+                    )
+                    debug_show_inline("ERROR", "Gemini AI", duration, str(e))
 
 
 @error_handler
@@ -72,10 +90,12 @@ def render_news():
 @error_handler
 def render_reports():
     """Trang Báo cáo."""
+    dlog = get_debug_logger()
     st.markdown("### 📑 Báo cáo thị trường")
 
     if st.button("🤖 Tạo báo cáo AI", type="primary"):
         with st.spinner("🤖 AI đang tạo báo cáo..."):
+            t0 = time.perf_counter()
             try:
                 from src.ai.services.analysis_service import AIAnalysisService
                 ai = AIAnalysisService()
@@ -84,12 +104,31 @@ def render_reports():
                     "hnx": "Đang cập nhật",
                     "total_volume": "Đang cập nhật",
                 })
+                duration = (time.perf_counter() - t0) * 1000
                 if result["success"]:
                     st.markdown(result["report"])
+                    dlog.log_ai_request(
+                        page="reports", component="render_reports",
+                        provider="Gemini", prompt_preview="Generate market report",
+                        result_status="SUCCESS", duration_ms=duration
+                    )
+                    debug_show_inline("SUCCESS", "Gemini AI", duration)
                 else:
                     st.warning(result["report"])
+                    dlog.log_ai_request(
+                        page="reports", component="render_reports",
+                        provider="Gemini", prompt_preview="Generate market report",
+                        result_status="EMPTY", duration_ms=duration
+                    )
             except Exception as e:
+                duration = (time.perf_counter() - t0) * 1000
                 st.error(f"❌ {e}")
+                dlog.log_ai_request(
+                    page="reports", component="render_reports",
+                    provider="Gemini", prompt_preview="Generate market report",
+                    result_status="ERROR", error=e, duration_ms=duration
+                )
+                debug_show_inline("ERROR", "Gemini AI", duration, str(e))
 
     st.divider()
     st.info("📊 Tính năng export PDF/Excel sẽ sẵn sàng trong bản cập nhật tiếp theo.")
@@ -115,10 +154,12 @@ def render_macro():
 @error_handler  
 def render_fundamental_page():
     """Trang Phân tích cơ bản độc lập."""
+    dlog = get_debug_logger()
     symbol = symbol_selector(key="fund_sym", exchange="stock")
 
     if st.button("📋 Phân tích", type="primary"):
         with st.spinner("📋 Đang phân tích..."):
+            t0 = time.perf_counter()
             try:
                 from src.data.connectors.vnstock_connector import VnstockFreeConnector
                 connector = VnstockFreeConnector()
@@ -136,8 +177,25 @@ def render_fundamental_page():
 
                 # Income statement
                 income = connector.get_financial_data(symbol, "income")
+                duration = (time.perf_counter() - t0) * 1000
                 if income is not None and not income.empty:
                     st.markdown("#### 📊 Báo cáo thu nhập")
                     st.dataframe(income, width='stretch')
+                
+                dlog.log_api_call(
+                    page="fundamental", component="render_fundamental_page",
+                    source="VnstockFreeConnector", method="get_financial_data",
+                    params={"symbol": symbol, "types": "ratio,income"},
+                    result_status="SUCCESS", duration_ms=duration, symbol=symbol
+                )
+                debug_show_inline("SUCCESS", "vnstock", duration)
             except Exception as e:
+                duration = (time.perf_counter() - t0) * 1000
                 st.error(f"❌ {e}")
+                dlog.log_api_call(
+                    page="fundamental", component="render_fundamental_page",
+                    source="VnstockFreeConnector", method="get_financial_data",
+                    params={"symbol": symbol},
+                    result_status="ERROR", error=e, duration_ms=duration, symbol=symbol
+                )
+                debug_show_inline("ERROR", "vnstock", duration, str(e))

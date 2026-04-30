@@ -2,19 +2,23 @@
 KTSTOCK - Stock Analysis Page
 Trang phân tích cổ phiếu chi tiết.
 """
+import time
 import streamlit as st
 import pandas as pd
 
 from src.app.components.shared import (
-    symbol_selector, date_range_selector, signal_badge, trend_badge, error_handler
+    symbol_selector, date_range_selector, signal_badge, trend_badge,
+    error_handler, debug_show_inline
 )
 from src.app.i18n import t
+from src.utils.debug_logger import get_debug_logger, LogCategory, LogLevel
 
 
 @error_handler
 def render_stock_analysis():
     """Render trang phân tích cổ phiếu."""
     lang = st.session_state.get("language", "vi")
+    dlog = get_debug_logger()
 
     # === Symbol & Date Selection ===
     col_sym, col_date = st.columns([1, 2])
@@ -29,20 +33,46 @@ def render_stock_analysis():
 
     # === Fetch Data ===
     with st.spinner(f"📡 Đang tải dữ liệu {symbol}..."):
+        t0 = time.perf_counter()
         try:
             from src.data.connectors.vnstock_connector import VnstockFreeConnector
             connector = VnstockFreeConnector()
             connector.connect()
             df = connector.get_historical_data(symbol, start_date, end_date)
+            duration = (time.perf_counter() - t0) * 1000
         except Exception as e:
+            duration = (time.perf_counter() - t0) * 1000
             st.error(f"❌ Lỗi kết nối: {e}")
+            dlog.log_api_call(
+                page="stock_analysis", component="render_stock_analysis",
+                source="VnstockFreeConnector", method="get_historical_data",
+                params={"symbol": symbol, "start": start_date, "end": end_date},
+                result_status="ERROR", error=e, duration_ms=duration, symbol=symbol
+            )
+            debug_show_inline("ERROR", "vnstock", duration, str(e))
             return
 
     if df is None or df.empty:
         st.warning(f"📭 Không có dữ liệu cho {symbol}")
-        if st.session_state.get("debug_mode", False) and hasattr(connector, 'last_error'):
-            st.error(f"🛠️ **DEBUG LOG**: {connector.last_error}")
+        dlog.log_api_call(
+            page="stock_analysis", component="render_stock_analysis",
+            source="VnstockFreeConnector", method="get_historical_data",
+            params={"symbol": symbol, "start": start_date, "end": end_date},
+            result_status="EMPTY", duration_ms=duration, symbol=symbol,
+            action_detail=f"Connector last_error: {getattr(connector, 'last_error', 'N/A')}"
+        )
+        debug_show_inline("EMPTY", "vnstock", duration, getattr(connector, 'last_error', ''))
         return
+    
+    # Log success
+    dlog.log_api_call(
+        page="stock_analysis", component="render_stock_analysis",
+        source="VnstockFreeConnector", method="get_historical_data",
+        params={"symbol": symbol, "start": start_date, "end": end_date},
+        result_status="SUCCESS", duration_ms=duration, symbol=symbol,
+        action_detail=f"Fetched {len(df)} rows"
+    )
+    debug_show_inline("SUCCESS", "vnstock", duration)
 
     # === Tabs ===
     tab_chart, tab_technical, tab_fundamental, tab_ai = st.tabs([
@@ -142,31 +172,79 @@ def _render_technical_tab(df: pd.DataFrame, symbol: str):
 
 def _render_fundamental_tab(symbol: str, connector):
     """Tab phân tích cơ bản."""
+    dlog = get_debug_logger()
     st.markdown("#### 📋 Phân tích cơ bản")
 
+    # Company info
+    t0 = time.perf_counter()
     try:
         company = connector.get_company_info(symbol)
+        duration = (time.perf_counter() - t0) * 1000
         if company:
             st.json(company)
+            dlog.log_api_call(
+                page="stock_analysis", component="_render_fundamental_tab",
+                source="VnstockFreeConnector", method="get_company_info",
+                params={"symbol": symbol}, result_status="SUCCESS",
+                duration_ms=duration, symbol=symbol
+            )
         else:
             st.info("📭 Không có dữ liệu công ty")
+            dlog.log_api_call(
+                page="stock_analysis", component="_render_fundamental_tab",
+                source="VnstockFreeConnector", method="get_company_info",
+                params={"symbol": symbol}, result_status="EMPTY",
+                duration_ms=duration, symbol=symbol
+            )
     except Exception as e:
+        duration = (time.perf_counter() - t0) * 1000
         st.warning(f"⚠️ {e}")
+        dlog.log_api_call(
+            page="stock_analysis", component="_render_fundamental_tab",
+            source="VnstockFreeConnector", method="get_company_info",
+            params={"symbol": symbol}, result_status="ERROR", error=e,
+            duration_ms=duration, symbol=symbol
+        )
 
+    # Financial ratios
+    t0 = time.perf_counter()
     try:
         ratios = connector.get_financial_data(symbol, "ratio")
+        duration = (time.perf_counter() - t0) * 1000
         if ratios is not None and not ratios.empty:
             st.dataframe(ratios, width='stretch')
+            dlog.log_api_call(
+                page="stock_analysis", component="_render_fundamental_tab",
+                source="VnstockFreeConnector", method="get_financial_data",
+                params={"symbol": symbol, "report_type": "ratio"}, result_status="SUCCESS",
+                duration_ms=duration, symbol=symbol
+            )
+        else:
+            dlog.log_api_call(
+                page="stock_analysis", component="_render_fundamental_tab",
+                source="VnstockFreeConnector", method="get_financial_data",
+                params={"symbol": symbol, "report_type": "ratio"}, result_status="EMPTY",
+                duration_ms=duration, symbol=symbol
+            )
     except Exception as e:
+        duration = (time.perf_counter() - t0) * 1000
         st.warning(f"⚠️ {e}")
+        dlog.log_api_call(
+            page="stock_analysis", component="_render_fundamental_tab",
+            source="VnstockFreeConnector", method="get_financial_data",
+            params={"symbol": symbol, "report_type": "ratio"}, result_status="ERROR",
+            error=e, duration_ms=duration, symbol=symbol
+        )
 
 
 def _render_ai_tab(symbol: str, df: pd.DataFrame):
     """Tab phân tích AI."""
+    dlog = get_debug_logger()
     st.markdown("#### 🤖 Phân tích bằng AI")
 
     if st.button("🚀 Phân tích bằng Gemini AI", key="ai_stock_btn", type="primary"):
         with st.spinner("🤖 AI đang phân tích..."):
+            t0 = time.perf_counter()
             try:
                 from src.ai.services.analysis_service import AIAnalysisService
                 from src.core.analysis.technical import TechnicalAnalysis
@@ -183,12 +261,31 @@ def _render_ai_tab(symbol: str, df: pd.DataFrame):
                     "macd": signals.get("macd_hist"),
                     "trend": signals.get("trend"),
                 })
+                duration = (time.perf_counter() - t0) * 1000
 
                 if result["success"]:
                     st.markdown(result["analysis"])
+                    dlog.log_ai_request(
+                        page="stock_analysis", component="_render_ai_tab",
+                        provider="Gemini", prompt_preview=f"Analyze {symbol}",
+                        result_status="SUCCESS", duration_ms=duration
+                    )
+                    debug_show_inline("SUCCESS", "Gemini AI", duration)
                 else:
                     st.warning(result["analysis"])
+                    dlog.log_ai_request(
+                        page="stock_analysis", component="_render_ai_tab",
+                        provider="Gemini", prompt_preview=f"Analyze {symbol}",
+                        result_status="EMPTY", duration_ms=duration
+                    )
             except Exception as e:
+                duration = (time.perf_counter() - t0) * 1000
                 st.error(f"❌ Lỗi AI: {e}")
+                dlog.log_ai_request(
+                    page="stock_analysis", component="_render_ai_tab",
+                    provider="Gemini", prompt_preview=f"Analyze {symbol}",
+                    result_status="ERROR", error=e, duration_ms=duration
+                )
+                debug_show_inline("ERROR", "Gemini AI", duration, str(e))
     else:
         st.info("👆 Nhấn nút để bắt đầu phân tích AI")

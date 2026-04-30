@@ -37,7 +37,8 @@
         "news": "Tin tức & Sentiment",
         "reports": "Báo cáo",
         "settings": "Cài đặt",
-        "admin": "Quản trị hệ thống"
+        "admin": "Quản trị hệ thống",
+        "log_viewer": "Quản lý Log"
     },
     "common": {
         "loading": "Đang tải...",

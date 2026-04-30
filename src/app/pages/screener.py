@@ -1,4 +1,4 @@
-﻿"""
+"""
 KTSTOCK - Stock Screener Page
 Trang bộ lọc cổ phiếu đa tiêu chí.
 """
@@ -89,11 +89,17 @@ def render_screener():
 
     if st.button("🔍 Chạy bộ lọc", type="primary", key="run_screener"):
         with st.spinner("🔍 Đang lọc..."):
+            import time as _time
+            from src.utils.debug_logger import get_debug_logger
+            from src.app.components.shared import debug_show_inline
+            dlog = get_debug_logger()
+            t0 = _time.perf_counter()
             try:
                 from src.data.connectors.vnstock_connector import VnstockFreeConnector
                 connector = VnstockFreeConnector()
                 connector.connect()
                 listing = connector.get_listing()
+                duration = (_time.perf_counter() - t0) * 1000
 
                 if listing is not None and not listing.empty:
                     # Apply custom filters
@@ -105,9 +111,31 @@ def render_screener():
 
                     st.success(f"✅ Tìm thấy {len(result)} cổ phiếu phù hợp")
                     render_dataframe(result, height=500)
+                    dlog.log_api_call(
+                        page="screener", component="render_screener",
+                        source="VnstockFreeConnector", method="get_listing",
+                        params={"filters": st.session_state.get("custom_filters", [])},
+                        result_status="SUCCESS", duration_ms=duration,
+                        action_detail=f"Found {len(result)} stocks"
+                    )
+                    debug_show_inline("SUCCESS", "vnstock", duration)
                 else:
                     st.warning("📭 Không thể tải danh sách cổ phiếu")
+                    dlog.log_api_call(
+                        page="screener", component="render_screener",
+                        source="VnstockFreeConnector", method="get_listing",
+                        params={}, result_status="EMPTY", duration_ms=duration
+                    )
+                    debug_show_inline("EMPTY", "vnstock", duration)
             except Exception as e:
+                duration = (_time.perf_counter() - t0) * 1000
                 st.error(f"❌ Lỗi: {e}")
+                dlog.log_api_call(
+                    page="screener", component="render_screener",
+                    source="VnstockFreeConnector", method="get_listing",
+                    params={}, result_status="ERROR", error=e, duration_ms=duration
+                )
+                debug_show_inline("ERROR", "vnstock", duration, str(e))
     else:
         st.info("👆 Chọn preset hoặc thêm bộ lọc tùy chỉnh, sau đó nhấn 'Chạy bộ lọc'")
+

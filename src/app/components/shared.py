@@ -1,4 +1,4 @@
-﻿"""
+"""
 KTSTOCK - Shared UI Components
 Components dùng chung cho các trang Streamlit.
 """
@@ -103,11 +103,44 @@ def render_dataframe(df: pd.DataFrame, title: str = "", height: int = 400):
 
 
 def error_handler(func):
-    """Decorator bắt lỗi cho page rendering."""
+    """Decorator bắt lỗi cho page rendering — tự động ghi debug log."""
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
             st.error(f"❌ Lỗi: {e}")
             st.caption("Vui lòng thử lại hoặc kiểm tra kết nối.")
+            # Ghi debug log
+            try:
+                from src.utils.debug_logger import get_debug_logger
+                dlog = get_debug_logger()
+                page = st.session_state.get("current_page", "unknown")
+                dlog.log_ui_error(page, func.__name__, e)
+            except Exception:
+                pass
     return wrapper
+
+
+def debug_show_inline(result_status: str, source: str = "", duration_ms: float = 0, error_msg: str = ""):
+    """Hiển thị inline debug info nếu debug_mode=ON."""
+    if not st.session_state.get("debug_mode", False):
+        return
+    
+    color = "#00C853" if result_status == "SUCCESS" else (
+        "#FFC107" if result_status == "EMPTY" else "#FF1744"
+    )
+    parts = [f"<span style='color:{color};font-weight:600;'>{result_status}</span>"]
+    if source:
+        parts.append(f"Source: {source}")
+    if duration_ms > 0:
+        parts.append(f"⏱ {duration_ms:.0f}ms")
+    if error_msg:
+        parts.append(f"❌ {error_msg[:120]}")
+
+    st.markdown(
+        f"<div style='font-size:0.7rem;color:#888;padding:2px 8px;background:rgba(255,255,255,0.03);"
+        f"border-radius:4px;margin:2px 0;border-left:3px solid {color};'>"
+        f"🛠️ {'  |  '.join(parts)}</div>",
+        unsafe_allow_html=True,
+    )
+

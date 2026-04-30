@@ -37,7 +37,8 @@
         "news": "News & Sentiment",
         "reports": "Reports",
         "settings": "Settings",
-        "admin": "System Admin"
+        "admin": "System Admin",
+        "log_viewer": "Log Manager"
     },
     "common": {
         "loading": "Loading...",

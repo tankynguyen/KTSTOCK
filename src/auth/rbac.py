@@ -31,6 +31,7 @@ PERMISSIONS = {
     "manage_portfolio":      [UserRole.USER, UserRole.ANALYST, UserRole.ADMIN],
     "use_ai_analysis":       [UserRole.ANALYST, UserRole.ADMIN],
     "view_admin_panel":      [UserRole.ADMIN],
+    "view_log_viewer":       [UserRole.ADMIN],
 }
 
 
@@ -88,6 +89,7 @@ def get_accessible_pages(user_role: str) -> list[dict]:
         {"key": "reports",         "label": "Báo cáo",             "icon": "📑", "permission": "view_reports"},
         {"key": "settings",        "label": "Cài đặt",            "icon": "⚙️", "permission": "manage_settings"},
         {"key": "admin",           "label": "Quản trị",           "icon": "🛡️", "permission": "view_admin_panel"},
+        {"key": "log_viewer",      "label": "Quản lý Log",        "icon": "📋", "permission": "view_log_viewer"},
     ]
 
     return [page for page in ALL_PAGES if has_permission(user_role, page["permission"])]
