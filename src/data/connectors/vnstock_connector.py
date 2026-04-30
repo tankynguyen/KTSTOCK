@@ -142,9 +142,14 @@ class VnstockFreeConnector(BaseConnector):
             return cached
 
         try:
-            from vnstock import Listing
-            listing = Listing(source=self.source)
-            df = listing.all_symbols()
+            try:
+                from vnstock_data import Listing
+                listing = Listing(source="VND")
+                df = listing.all_symbols()
+            except ImportError:
+                from vnstock import Listing
+                listing = Listing(source=self.source)
+                df = listing.all_symbols()
             if df is not None and not df.empty:
                 self.cache.set_dataframe(cache_key, df, ttl=86400)  # 24h
             return df

@@ -133,14 +133,11 @@ class VnstockSponsoredConnector(BaseConnector):
             return cached
 
         try:
-            if self._is_unified_ui:
-                from vnstock_data import Reference
-                ref = Reference()
-                df = ref.listing()
-            else:
-                from vnstock_data import Listing
-                listing = Listing(source=self.source)
-                df = listing.all_symbols()
+            # Unified UI's Reference().equity.list() currently fails due to TCBS endpoint.
+            # Fallback to Listing(source="VND")
+            from vnstock_data import Listing
+            listing = Listing(source="VND")
+            df = listing.all_symbols()
 
             if df is not None and not df.empty:
                 self.cache.set_dataframe(cache_key, df, ttl=86400)

@@ -64,3 +64,4 @@ build/
 models/*.pkl
 models/*.h5
 models/*.pt
+data/ohlcv/ACB.csv
