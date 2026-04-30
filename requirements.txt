@@ -31,3 +31,9 @@ pyjwt>=2.8.0
 openpyxl>=3.1.0
 xlsxwriter>=3.2.0
 nest-asyncio>=1.6.0
+# vnstock ecosystem (cài qua vnstock-installer nếu là gói Insiders)
+vnstock_data
+vnstock_ta
+vnstock_news
+vnstock_chart
+vnstock_pipeline

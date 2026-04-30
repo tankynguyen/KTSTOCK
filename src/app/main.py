@@ -388,6 +388,7 @@ def render_main_content():
         "settings": ("⚙️", t("nav.settings", lang)),
         "admin": ("🛡️", t("nav.admin", lang)),
         "log_viewer": ("📋", t("nav.log_viewer", lang)),
+        "connector_test": ("🧪", "Test Connectors"),
     }
 
     icon, title = page_titles.get(page, ("📊", "Dashboard"))
@@ -439,6 +440,9 @@ def render_main_content():
     elif page == "log_viewer":
         from src.app.pages.log_viewer import render_log_viewer
         render_log_viewer()
+    elif page == "connector_test":
+        from src.app.pages.connector_test import render_connector_test
+        render_connector_test()
 
 
 # ============================================================

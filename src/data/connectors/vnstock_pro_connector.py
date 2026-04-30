@@ -1,7 +1,7 @@
 """
 KTSTOCK - vnstock Sponsored Connector (vnstock_data)
 Kết nối dữ liệu chứng khoán VN qua vnstock_data (Sponsored - tốc độ nhanh hơn).
-Hoạt động ĐỘC LẬP với vnstock Free connector.
+Hỗ trợ đầy đủ: Quote, Company, Finance, Trading, Market, Macro, Commodity, Fund API.
 """
 import time
 from typing import Optional
@@ -76,6 +76,10 @@ class VnstockSponsoredConnector(BaseConnector):
         except Exception as e:
             return {"status": "error", "message": str(e), "latency_ms": 0}
 
+    # ============================================================
+    # QUOTE / PRICE API
+    # ============================================================
+
     @timer
     @retry(max_retries=2, delay=1.0)
     def get_historical_data(
@@ -115,6 +119,10 @@ class VnstockSponsoredConnector(BaseConnector):
             logger.error(f"❌ [Sponsored] Error fetching {symbol} history: {e}")
             return None
 
+    # ============================================================
+    # LISTING API
+    # ============================================================
+
     @timer
     @retry(max_retries=2, delay=1.0)
     def get_listing(self) -> Optional[pd.DataFrame]:
@@ -140,6 +148,10 @@ class VnstockSponsoredConnector(BaseConnector):
         except Exception as e:
             logger.error(f"❌ [Sponsored] Error fetching listing: {e}")
             return None
+
+    # ============================================================
+    # COMPANY API
+    # ============================================================
 
     @timer
     def get_company_info(self, symbol: str) -> Optional[dict]:
@@ -173,6 +185,10 @@ class VnstockSponsoredConnector(BaseConnector):
         except Exception as e:
             logger.error(f"❌ [Sponsored] Error fetching company {symbol}: {e}")
         return None
+
+    # ============================================================
+    # FINANCE API
+    # ============================================================
 
     @timer
     def get_financial_data(
@@ -221,13 +237,180 @@ class VnstockSponsoredConnector(BaseConnector):
             logger.error(f"❌ [Sponsored] Error fetching {report_type} for {symbol}: {e}")
             return None
 
+    # ============================================================
+    # TRADING API
+    # ============================================================
+
     @timer
-    def get_macro_data(self, indicator: str = "gdp") -> Optional[pd.DataFrame]:
-        """Lấy dữ liệu kinh tế vĩ mô (chỉ Sponsored)."""
-        if not self._is_unified_ui:
-            logger.warning("⚠️ Macro data requires vnstock_data >= 3.0.0")
+    def get_price_board(self, symbols_list: list[str]) -> Optional[pd.DataFrame]:
+        """Lấy bảng giá real-time (Sponsored)."""
+        cache_key = generate_cache_key("vnpro_priceboard", "_".join(sorted(symbols_list)))
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Trading
+            trading = Trading(source=self.source, symbol=symbols_list[0].upper())
+            df = trading.price_board(symbol_list=[s.upper() for s in symbols_list])
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=60)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching price board: {e}")
             return None
 
+    @timer
+    def get_foreign_trade(self, symbol: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """Lấy dữ liệu giao dịch khối ngoại."""
+        cache_key = generate_cache_key("vnpro_foreign", symbol, start_date, end_date)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Trading
+            trading = Trading(source=self.source, symbol=symbol.upper())
+            df = trading.foreign_trade(start=start_date, end=end_date)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching foreign trade {symbol}: {e}")
+            return None
+
+    @timer
+    def get_prop_trade(self, symbol: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """Lấy dữ liệu tự doanh."""
+        cache_key = generate_cache_key("vnpro_prop", symbol, start_date, end_date)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Trading
+            trading = Trading(source=self.source, symbol=symbol.upper())
+            df = trading.prop_trade(start=start_date, end=end_date)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching prop trade {symbol}: {e}")
+            return None
+
+    @timer
+    def get_insider_deal(self, symbol: str) -> Optional[pd.DataFrame]:
+        """Lấy giao dịch nội bộ."""
+        cache_key = generate_cache_key("vnpro_insider_deal", symbol)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Trading
+            trading = Trading(source=self.source, symbol=symbol.upper())
+            df = trading.insider_deal()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching insider deal {symbol}: {e}")
+            return None
+
+    @timer
+    def get_order_stats(self, symbol: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """Lấy thống kê lệnh."""
+        cache_key = generate_cache_key("vnpro_orderstats", symbol, start_date, end_date)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Trading
+            trading = Trading(source=self.source, symbol=symbol.upper())
+            df = trading.order_stats(start=start_date, end=end_date)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching order stats {symbol}: {e}")
+            return None
+
+    # ============================================================
+    # MARKET API
+    # ============================================================
+
+    @timer
+    def get_market_pe(self) -> Optional[pd.DataFrame]:
+        """Lấy P/E toàn thị trường."""
+        cache_key = generate_cache_key("vnpro_market_pe")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Market
+            market = Market()
+            df = market.pe()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching market P/E: {e}")
+            return None
+
+    @timer
+    def get_market_pb(self) -> Optional[pd.DataFrame]:
+        """Lấy P/B toàn thị trường."""
+        cache_key = generate_cache_key("vnpro_market_pb")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Market
+            market = Market()
+            df = market.pb()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching market P/B: {e}")
+            return None
+
+    @timer
+    def get_market_evaluation(self) -> Optional[pd.DataFrame]:
+        """Lấy định giá thị trường tổng hợp."""
+        cache_key = generate_cache_key("vnpro_market_eval")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from vnstock_data import Market
+            market = Market()
+            df = market.evaluation()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching market evaluation: {e}")
+            return None
+
+    # ============================================================
+    # MACRO API
+    # ============================================================
+
+    @timer
+    def get_macro_data(self, indicator: str = "gdp") -> Optional[pd.DataFrame]:
+        """
+        Lấy dữ liệu kinh tế vĩ mô.
+
+        Args:
+            indicator: gdp, cpi, exchange_rate, fdi, money_supply,
+                      interest_rate, industry_prod, import_export,
+                      retail, population_labor
+        """
         cache_key = generate_cache_key("vnpro_macro", indicator)
         cached = self.cache.get_dataframe(cache_key)
         if cached is not None:
@@ -236,12 +419,224 @@ class VnstockSponsoredConnector(BaseConnector):
         try:
             from vnstock_data import Macro
             macro = Macro()
-            df = getattr(macro, indicator, lambda: None)()
+            fetch_fn = getattr(macro, indicator, None)
+            if fetch_fn is None:
+                logger.warning(f"⚠️ Unknown macro indicator: {indicator}")
+                return None
+            df = fetch_fn()
             if df is not None and not df.empty:
                 self.cache.set_dataframe(cache_key, df, ttl=86400)
             return df
         except Exception as e:
             logger.error(f"❌ [Sponsored] Error fetching macro {indicator}: {e}")
+            return None
+
+    @timer
+    def get_gdp(self, start: str = None, end: str = None, period: str = "quarter") -> Optional[pd.DataFrame]:
+        """Lấy GDP."""
+        cache_key = generate_cache_key("vnpro_gdp", str(start), str(end), period)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Macro
+            macro = Macro()
+            kwargs = {"period": period}
+            if start:
+                kwargs["start"] = start
+            if end:
+                kwargs["end"] = end
+            df = macro.gdp(**kwargs)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching GDP: {e}")
+            return None
+
+    @timer
+    def get_cpi(self, start: str = None, end: str = None, period: str = "month") -> Optional[pd.DataFrame]:
+        """Lấy CPI."""
+        cache_key = generate_cache_key("vnpro_cpi", str(start), str(end), period)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Macro
+            macro = Macro()
+            kwargs = {"period": period}
+            if start:
+                kwargs["start"] = start
+            if end:
+                kwargs["end"] = end
+            df = macro.cpi(**kwargs)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching CPI: {e}")
+            return None
+
+    @timer
+    def get_exchange_rate(self, start: str = None, end: str = None, period: str = "day") -> Optional[pd.DataFrame]:
+        """Lấy tỷ giá ngoại tệ."""
+        cache_key = generate_cache_key("vnpro_exrate", str(start), str(end), period)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Macro
+            macro = Macro()
+            kwargs = {"period": period}
+            if start:
+                kwargs["start"] = start
+            if end:
+                kwargs["end"] = end
+            df = macro.exchange_rate(**kwargs)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching exchange rate: {e}")
+            return None
+
+    @timer
+    def get_fdi(self, start: str = None, end: str = None, period: str = "month") -> Optional[pd.DataFrame]:
+        """Lấy FDI."""
+        cache_key = generate_cache_key("vnpro_fdi", str(start), str(end), period)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Macro
+            macro = Macro()
+            kwargs = {"period": period}
+            if start:
+                kwargs["start"] = start
+            if end:
+                kwargs["end"] = end
+            df = macro.fdi(**kwargs)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching FDI: {e}")
+            return None
+
+    @timer
+    def get_interest_rate(self, length: str = "1Y", period: str = "day") -> Optional[pd.DataFrame]:
+        """Lấy lãi suất liên ngân hàng."""
+        cache_key = generate_cache_key("vnpro_interest", length, period)
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Macro
+            macro = Macro()
+            df = macro.interest_rate(length=length, period=period)
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching interest rate: {e}")
+            return None
+
+    # ============================================================
+    # COMMODITY API
+    # ============================================================
+
+    @timer
+    def get_gold_price(self) -> Optional[pd.DataFrame]:
+        """Lấy giá vàng Việt Nam."""
+        cache_key = generate_cache_key("vnpro_gold")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Commodity
+            commodity = Commodity()
+            df = commodity.gold_vn()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching gold price: {e}")
+            return None
+
+    @timer
+    def get_oil_price(self) -> Optional[pd.DataFrame]:
+        """Lấy giá dầu thô."""
+        cache_key = generate_cache_key("vnpro_oil")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Commodity
+            commodity = Commodity()
+            df = commodity.oil_crude()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching oil price: {e}")
+            return None
+
+    @timer
+    def get_steel_price(self) -> Optional[pd.DataFrame]:
+        """Lấy giá thép HRC."""
+        cache_key = generate_cache_key("vnpro_steel")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Commodity
+            commodity = Commodity()
+            df = commodity.steel_hrc()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching steel price: {e}")
+            return None
+
+    @timer
+    def get_pork_price(self) -> Optional[pd.DataFrame]:
+        """Lấy giá heo hơi miền Bắc."""
+        cache_key = generate_cache_key("vnpro_pork")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Commodity
+            commodity = Commodity()
+            df = commodity.pork_north_vn()
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=3600)
+            return df
+        except Exception as e:
+            logger.error(f"❌ [Sponsored] Error fetching pork price: {e}")
+            return None
+
+    # ============================================================
+    # FUND API
+    # ============================================================
+
+    @timer
+    def get_etf_list(self) -> Optional[pd.DataFrame]:
+        """Lấy danh sách quỹ ETF."""
+        cache_key = generate_cache_key("vnpro_etf")
+        cached = self.cache.get_dataframe(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            from vnstock_data import Fund
+            fund = Fund()
+            df = fund.etf_list() if hasattr(fund, 'etf_list') else None
+            if df is not None and not df.empty:
+                self.cache.set_dataframe(cache_key, df, ttl=86400)
+            return df
+        except Exception as e:
+            logger.warning(f"⚠️ [Sponsored] ETF list not available: {e}")
             return None
 
     @timer
@@ -255,6 +650,10 @@ class VnstockSponsoredConnector(BaseConnector):
         except Exception as e:
             logger.error(f"❌ [Sponsored] Error fetching insights {symbol}: {e}")
         return None
+
+    # ============================================================
+    # SEARCH & UTILITIES
+    # ============================================================
 
     def search_symbols(self, query: str) -> list[dict]:
         """Tìm kiếm mã cổ phiếu."""

@@ -90,6 +90,7 @@ def get_accessible_pages(user_role: str) -> list[dict]:
         {"key": "settings",        "label": "Cài đặt",            "icon": "⚙️", "permission": "manage_settings"},
         {"key": "admin",           "label": "Quản trị",           "icon": "🛡️", "permission": "view_admin_panel"},
         {"key": "log_viewer",      "label": "Quản lý Log",        "icon": "📋", "permission": "view_log_viewer"},
+        {"key": "connector_test",  "label": "Test Connectors",    "icon": "🧪", "permission": "view_admin_panel"},
     ]
 
     return [page for page in ALL_PAGES if has_permission(user_role, page["permission"])]

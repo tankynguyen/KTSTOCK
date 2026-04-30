@@ -38,7 +38,8 @@
         "reports": "Báo cáo",
         "settings": "Cài đặt",
         "admin": "Quản trị hệ thống",
-        "log_viewer": "Quản lý Log"
+        "log_viewer": "Quản lý Log",
+        "connector_test": "Test Connectors"
     },
     "common": {
         "loading": "Đang tải...",

@@ -21,7 +21,7 @@ class GeminiProvider:
     def __init__(self, api_key: Optional[str] = None):
         settings = get_settings()
         self.api_key = api_key or settings.ai.gemini_api_key
-        self.model_name = "gemini-1.5-flash"
+        self.model_name = "gemini-2.5-flash"
         self._model = None
         self._is_connected = False
         self.cache = get_cache()
