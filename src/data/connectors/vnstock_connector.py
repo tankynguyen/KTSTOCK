@@ -85,6 +85,8 @@ class VnstockFreeConnector(BaseConnector):
         if not self._is_connected:
             self.connect()
 
+        self.last_error = None
+        
         # Check cache
         cache_key = generate_cache_key("vnfree_hist", symbol, start_date, end_date, interval)
         cached = self.cache.get_dataframe(cache_key)
@@ -92,23 +94,34 @@ class VnstockFreeConnector(BaseConnector):
             logger.debug(f"📦 Cache hit: {symbol} history")
             return cached
 
-        try:
-            from vnstock import Quote
-            quote = Quote(source=self.source, symbol=symbol.upper())
-            df = quote.history(start=start_date, end=end_date, interval=interval)
+        sources_to_try = [self.source]
+        fallback_sources = ["DNSE", "KBS", "MSN", "FMP"]
+        for src in fallback_sources:
+            if src.upper() != self.source.upper():
+                sources_to_try.append(src.upper())
 
-            if df is not None and not df.empty:
-                # Chuẩn hóa columns
-                df = self._normalize_columns(df)
-                # Cache kết quả (1 giờ)
-                self.cache.set_dataframe(cache_key, df, ttl=3600)
-                logger.info(f"📈 Fetched {len(df)} rows for {symbol} ({start_date} → {end_date})")
+        errors = []
+        for current_source in sources_to_try:
+            try:
+                from vnstock import Quote
+                quote = Quote(source=current_source, symbol=symbol.upper())
+                df = quote.history(start=start_date, end=end_date, interval=interval)
 
-            return df
-        except Exception as e:
-            self.last_error = str(e)
-            logger.error(f"❌ Error fetching {symbol} history: {e}")
-            return None
+                if df is not None and not df.empty:
+                    # Chuẩn hóa columns
+                    df = self._normalize_columns(df)
+                    # Cache kết quả (1 giờ)
+                    self.cache.set_dataframe(cache_key, df, ttl=3600)
+                    logger.info(f"📈 Fetched {len(df)} rows for {symbol} ({start_date} → {end_date}) via {current_source}")
+                    return df
+                else:
+                    errors.append(f"{current_source}: returned empty")
+            except Exception as e:
+                errors.append(f"{current_source}: {str(e)}")
+
+        self.last_error = f"All sources failed. Errors: {'; '.join(errors)}"
+        logger.error(f"❌ Error fetching {symbol} history: {self.last_error}")
+        return None
 
     @timer
     @retry(max_retries=2, delay=1.0)
