@@ -6,7 +6,12 @@ Chạy ứng dụng:
     streamlit run src/app/main.py
 """
 import sys
+import os
 from pathlib import Path
+import dotenv
+
+# Load .env into os.environ
+dotenv.load_dotenv(override=True)
 
 # Thêm project root vào Python path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent

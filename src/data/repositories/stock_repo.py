@@ -83,6 +83,7 @@ class StockRepository:
 
         # Lưu vào database nếu có dữ liệu
         if df is not None and not df.empty:
+            self.ensure_symbol(symbol)
             self._save_to_db(symbol, df, interval)
 
         return df
@@ -147,6 +148,16 @@ class StockRepository:
         elif use_sponsored is False and self._free_available:
             return self.free_connector
         return self.active_connector
+
+    def ensure_symbol(self, symbol: str, exchange: str = "UNKNOWN"):
+        """Đảm bảo symbol tồn tại trong database."""
+        symbol = symbol.upper().strip()
+        existing = self.db.execute_one("SELECT symbol FROM symbols WHERE symbol = ?", (symbol,))
+        if not existing:
+            self.db.execute_write(
+                "INSERT OR IGNORE INTO symbols (symbol, exchange) VALUES (?, ?)",
+                (symbol, exchange)
+            )
 
     def _save_to_db(self, symbol: str, df: pd.DataFrame, interval: str = "1D"):
         """Lưu dữ liệu vào database cho offline access."""

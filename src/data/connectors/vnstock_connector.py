@@ -95,7 +95,7 @@ class VnstockFreeConnector(BaseConnector):
             return cached
 
         sources_to_try = [self.source]
-        fallback_sources = ["DNSE", "KBS", "MSN", "FMP"]
+        fallback_sources = ["VCI", "KBS", "MSN"]
         for src in fallback_sources:
             if src.upper() != self.source.upper():
                 sources_to_try.append(src.upper())

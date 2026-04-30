@@ -27,10 +27,21 @@ class AlertEngine:
         notification_type: str = "in_app",
     ) -> int:
         """Tạo cảnh báo mới. Returns alert_id."""
+        symbol = symbol.upper().strip()
+        
+        # Đảm bảo symbol tồn tại trong bảng symbols (để không lỗi FK)
+        existing = self.db.execute_one("SELECT symbol FROM symbols WHERE symbol = ?", (symbol,))
+        if not existing:
+            # Tạm thời insert với exchange unknown nếu chưa có
+            self.db.execute_write(
+                "INSERT OR IGNORE INTO symbols (symbol, exchange, asset_type) VALUES (?, ?, ?)",
+                (symbol, "UNKNOWN", "stock")
+            )
+
         return self.db.execute_insert(
             """INSERT INTO alerts (user_id, symbol, condition, threshold, notification_type)
                VALUES (?, ?, ?, ?, ?)""",
-            (user_id, symbol.upper(), condition, threshold, notification_type)
+            (user_id, symbol, condition, threshold, notification_type)
         )
 
     def get_alerts(self, user_id: int, active_only: bool = True) -> list[dict]:
